@@ -1374,8 +1374,6 @@
             '萨米': '萨米.png',
             '伊比利亚': '伊比利亚.png'
         };
-        const BG_EXT_CANDIDATES = ['.png', '.jpg', '.jpeg', '.webp', '.avif'];
-        const bgResolvedCache = new Map();
         const FACTION_THEME_COLOR_MAP = {
             '拉特兰': '#d8e8ff',
             '岁': '#d7863f',
@@ -2158,61 +2156,6 @@
             }
         }
 
-        function pathWithoutExt(path) {
-            if (!path) return '';
-            const slashPos = path.lastIndexOf('/');
-            const dotPos = path.lastIndexOf('.');
-            if (dotPos <= slashPos) return path;
-            return path.slice(0, dotPos);
-        }
-
-        function probeImage(path) {
-            return new Promise(function(resolve) {
-                if (!path) {
-                    resolve(false);
-                    return;
-                }
-                const img = new Image();
-                img.onload = function() { resolve(true); };
-                img.onerror = function() { resolve(false); };
-                img.src = path;
-            });
-        }
-
-        async function resolveFactionResultBackground(faction) {
-            if (!faction) return '';
-            const cacheKey = faction.name || String(faction.id);
-            if (bgResolvedCache.has(cacheKey)) return bgResolvedCache.get(cacheKey);
-
-            const primary = (faction.resultBackground || '').trim();
-            const candidates = [];
-            if (primary) candidates.push(primary);
-            const fromMap = FACTION_RESULT_BG_MAP[faction.name];
-            if (fromMap) candidates.push(FACTION_RESULT_BG_BASE_DIR + '/' + fromMap);
-            const baseName = fromMap ? pathWithoutExt(fromMap) : '';
-            if (baseName) {
-                for (let i = 0; i < BG_EXT_CANDIDATES.length; i++) {
-                    const ext = BG_EXT_CANDIDATES[i];
-                    candidates.push(FACTION_RESULT_BG_BASE_DIR + '/' + baseName + ext);
-                }
-            }
-
-            const seen = new Set();
-            for (let i = 0; i < candidates.length; i++) {
-                const c = candidates[i];
-                if (!c || seen.has(c)) continue;
-                seen.add(c);
-                // eslint-disable-next-line no-await-in-loop
-                const ok = await probeImage(c);
-                if (ok) {
-                    bgResolvedCache.set(cacheKey, c);
-                    return c;
-                }
-            }
-            bgResolvedCache.set(cacheKey, '');
-            return '';
-        }
-
         function runLogicChecks() {
             console.assert(getFactionDistanceScore({ side: 'balanced', score: 65 }, 0) === 0, '持平映射异常');
             console.assert(getFactionDistanceScore({ side: 'left', score: 85 }, 1) < getFactionDistanceScore({ side: 'right', score: 85 }, 1), '维度方向距离判定异常');
@@ -2491,7 +2434,7 @@
             }
         }
 
-        async function showResult() {
+        function showResult() {
             const resultFaction = getBestMatchedFactionIndex();
             const faction = factionConfig[resultFaction];
             if (!faction) {
@@ -2507,15 +2450,14 @@
 
             const logoPath = (faction.logo || faction.image || '').trim();
 
-            const resolvedBg = await resolveFactionResultBackground(faction);
-            if (resolvedBg) {
-                document.body.style.setProperty('--dynamic-bg-image', 'url(\"' + resolvedBg + '\")');
+            if (faction.resultBackground && faction.resultBackground.trim() !== '') {
+                document.body.style.setProperty('--dynamic-bg-image', 'url(\"' + faction.resultBackground + '\")');
                 const mappedThemeColor = FACTION_THEME_COLOR_MAP[faction.name];
                 if (mappedThemeColor) {
                     setThemeAccent(mappedThemeColor);
                 } else {
                     resetThemeAccent();
-                    pickAccentFromImage(resolvedBg).then(function(colorHex) {
+                    pickAccentFromImage(faction.resultBackground).then(function(colorHex) {
                         if (colorHex) {
                             setThemeAccent(colorHex);
                             renderDimensionChart(faction);

@@ -1304,11 +1304,12 @@
         const BATCH_TEXT_UPDATE_HINT = {
             note: '可按5个阵营一批次更新 factionConfig 文本与 profile'
         };
-        const QUIZ_BG_BASE_DIR = '/assets/quiz-bg';
+        const ASSET_BASE_PREFIX = (window.location.protocol === 'file:') ? './assets' : '/assets';
+        const QUIZ_BG_BASE_DIR = ASSET_BASE_PREFIX + '/quiz-bg';
         const BACKGROUND_IMAGE_POOL = [
             QUIZ_BG_BASE_DIR + '/题目区.png'
         ];
-        const FACTION_LOGO_BASE_DIR = '/assets/logo';
+        const FACTION_LOGO_BASE_DIR = ASSET_BASE_PREFIX + '/logo';
         const FACTION_LOGO_MAP = {
             '拉特兰': '拉特兰.svg',
             '岁': '岁.jpg',
@@ -1341,7 +1342,7 @@
             '萨米': '萨米.svg',
             '伊比利亚': '伊比利亚.svg'
         };
-        const FACTION_RESULT_BG_BASE_DIR = '/assets/result-bg';
+        const FACTION_RESULT_BG_BASE_DIR = ASSET_BASE_PREFIX + '/result-bg';
         const FACTION_RESULT_BG_MAP = {
             '拉特兰': '拉特兰.jpg',
             '岁': '岁.png',

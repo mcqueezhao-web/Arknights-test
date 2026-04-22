@@ -1304,11 +1304,11 @@
         const BATCH_TEXT_UPDATE_HINT = {
             note: '可按5个阵营一批次更新 factionConfig 文本与 profile'
         };
-        const QUIZ_BG_BASE_DIR = 'D:/桌面/明日方舟国家势力标志Logo矢量重绘';
+        const QUIZ_BG_BASE_DIR = '/assets/quiz-bg';
         const BACKGROUND_IMAGE_POOL = [
             QUIZ_BG_BASE_DIR + '/题目区.png'
         ];
-        const FACTION_LOGO_BASE_DIR = 'D:/桌面/明日方舟阵营测试对应阵营logo以及背景';
+        const FACTION_LOGO_BASE_DIR = '/assets/logo';
         const FACTION_LOGO_MAP = {
             '拉特兰': '拉特兰.svg',
             '岁': '岁.jpg',
@@ -1341,7 +1341,7 @@
             '萨米': '萨米.svg',
             '伊比利亚': '伊比利亚.svg'
         };
-        const FACTION_RESULT_BG_BASE_DIR = 'D:/桌面/明日方舟国家势力标志Logo矢量重绘';
+        const FACTION_RESULT_BG_BASE_DIR = '/assets/result-bg';
         const FACTION_RESULT_BG_MAP = {
             '拉特兰': '拉特兰.jpg',
             '岁': '岁.png',
@@ -1369,11 +1369,13 @@
             '炎国': '炎.jpg',
             '萨尔贡': '萨尔贡.png',
             '玻利瓦尔': '玻利瓦尔.jpg',
-            '雷姆必拓': '雷姆必拓.jpg',
+            '雷姆必拓': '雷姆必拓.webp',
             '米诺斯': '米诺斯.png',
             '萨米': '萨米.png',
             '伊比利亚': '伊比利亚.png'
         };
+        const BG_EXT_CANDIDATES = ['.png', '.jpg', '.jpeg', '.webp', '.avif'];
+        const bgResolvedCache = new Map();
         const FACTION_THEME_COLOR_MAP = {
             '拉特兰': '#d8e8ff',
             '岁': '#d7863f',
@@ -2156,6 +2158,61 @@
             }
         }
 
+        function pathWithoutExt(path) {
+            if (!path) return '';
+            const slashPos = path.lastIndexOf('/');
+            const dotPos = path.lastIndexOf('.');
+            if (dotPos <= slashPos) return path;
+            return path.slice(0, dotPos);
+        }
+
+        function probeImage(path) {
+            return new Promise(function(resolve) {
+                if (!path) {
+                    resolve(false);
+                    return;
+                }
+                const img = new Image();
+                img.onload = function() { resolve(true); };
+                img.onerror = function() { resolve(false); };
+                img.src = path;
+            });
+        }
+
+        async function resolveFactionResultBackground(faction) {
+            if (!faction) return '';
+            const cacheKey = faction.name || String(faction.id);
+            if (bgResolvedCache.has(cacheKey)) return bgResolvedCache.get(cacheKey);
+
+            const primary = (faction.resultBackground || '').trim();
+            const candidates = [];
+            if (primary) candidates.push(primary);
+            const fromMap = FACTION_RESULT_BG_MAP[faction.name];
+            if (fromMap) candidates.push(FACTION_RESULT_BG_BASE_DIR + '/' + fromMap);
+            const baseName = fromMap ? pathWithoutExt(fromMap) : '';
+            if (baseName) {
+                for (let i = 0; i < BG_EXT_CANDIDATES.length; i++) {
+                    const ext = BG_EXT_CANDIDATES[i];
+                    candidates.push(FACTION_RESULT_BG_BASE_DIR + '/' + baseName + ext);
+                }
+            }
+
+            const seen = new Set();
+            for (let i = 0; i < candidates.length; i++) {
+                const c = candidates[i];
+                if (!c || seen.has(c)) continue;
+                seen.add(c);
+                // eslint-disable-next-line no-await-in-loop
+                const ok = await probeImage(c);
+                if (ok) {
+                    bgResolvedCache.set(cacheKey, c);
+                    return c;
+                }
+            }
+            bgResolvedCache.set(cacheKey, '');
+            return '';
+        }
+
         function runLogicChecks() {
             console.assert(getFactionDistanceScore({ side: 'balanced', score: 65 }, 0) === 0, '持平映射异常');
             console.assert(getFactionDistanceScore({ side: 'left', score: 85 }, 1) < getFactionDistanceScore({ side: 'right', score: 85 }, 1), '维度方向距离判定异常');
@@ -2434,7 +2491,7 @@
             }
         }
 
-        function showResult() {
+        async function showResult() {
             const resultFaction = getBestMatchedFactionIndex();
             const faction = factionConfig[resultFaction];
             if (!faction) {
@@ -2450,14 +2507,15 @@
 
             const logoPath = (faction.logo || faction.image || '').trim();
 
-            if (faction.resultBackground && faction.resultBackground.trim() !== '') {
-                document.body.style.setProperty('--dynamic-bg-image', 'url(\"' + faction.resultBackground + '\")');
+            const resolvedBg = await resolveFactionResultBackground(faction);
+            if (resolvedBg) {
+                document.body.style.setProperty('--dynamic-bg-image', 'url(\"' + resolvedBg + '\")');
                 const mappedThemeColor = FACTION_THEME_COLOR_MAP[faction.name];
                 if (mappedThemeColor) {
                     setThemeAccent(mappedThemeColor);
                 } else {
                     resetThemeAccent();
-                    pickAccentFromImage(faction.resultBackground).then(function(colorHex) {
+                    pickAccentFromImage(resolvedBg).then(function(colorHex) {
                         if (colorHex) {
                             setThemeAccent(colorHex);
                             renderDimensionChart(faction);
